@@ -1,4 +1,6 @@
 classdef MPSEquivalenceTest < matlabtest.compiler.TestCase
+    % This is a MATLAB Unit Test
+
     properties(TestParameter)
         % Can define different runtime inputs for the equivalence test
         % For now we will just run against 1 data point
@@ -23,7 +25,7 @@ classdef MPSEquivalenceTest < matlabtest.compiler.TestCase
             % Load the data we built via the build process
             disp("Loading MPS build results")
             prj = currentProject;
-            loadedData = load(prj.RootFolder + "/results/ctf-build-results.mat");
+            loadedData = load(prj.RootFolder + "/results/ctf-build-results.mat"); % metadata .mat file from the buil
             buildResults = loadedData.buildResults;
 
             % Execute the runtime inputs (damping) on the server
@@ -36,6 +38,8 @@ classdef MPSEquivalenceTest < matlabtest.compiler.TestCase
             disp("Verifying results match MATLAB results")
             % Note: Fails due to a bug which is fixed in the R2024a GR
             % testCase.verifyExecutionMatchesMATLAB(executionResults);
+            % %<--more convient and better diagnostics.  Use when GR
+            % shipps!
 
             % Verification workaround - not needed in GR. Note this
             % solution is not only less convenient, but also does not

@@ -2,14 +2,16 @@ function plan = buildfile
 import matlab.buildtool.tasks.*;
 
 plan = buildplan(localfunctions);
-plan.DefaultTasks = "release"; 
+plan.DefaultTasks = "release"; % could also make this ["release", "deploy"]
+% deploy will create the .ctf file(s)
+
 
 %% Enable cleaning derived build outputs
-plan("clean") = CleanTask;
+plan("clean") = CleanTask; %premade task
 
 
 %% Lint the code and tests
-plan("lint") = CodeIssuesTask(Results="results/code-issues.sarif");
+plan("lint") = CodeIssuesTask(Results="results/code-issues.sarif"); %premade task
 
 
 %% Build mex files and place them in toolbox folder
@@ -76,25 +78,26 @@ plan("release") = matlab.buildtool.Task(Dependencies="tbxIntegTest", ...
 
 
 % %% Build a MATLAB Production Server archive
-% %   Ad hoc task, task action defined in toolboxTask local function
-% plan("ctf").Dependencies = ["lint","test"];
-% plan("ctf").Inputs = ["code", "pcode", "buildutils/simulateSystemFunctionSignatures.json"];
-% plan("ctf").Outputs = [...
-%     "results/ctf-archive/MassSpringDamperService.ctf", ...
-%     "results/ctf-build-results.mat", ...
-%     "results/ctf-archive"];
+%   Ad hoc task, task action defined in toolboxTask local function
+plan("ctf").Dependencies = ["lint","test"]; % make this dependent on passing lint and unit tests..
+plan("ctf").Inputs = ["code", "pcode", "buildutils/simulateSystemFunctionSignatures.json"]; % If any of these change, rebuild
+plan("ctf").Outputs = [...
+    "results/ctf-archive/MassSpringDamperService.ctf", ...
+    "results/ctf-build-results.mat", ...
+    "results/ctf-archive"];
 
 
-% %% Integration tests - back-to-back equivalence tests for the production server archive
-% plan("ctfIntegTest") = TestTask("integTests/equivalence",SourceFiles=["code","pcode"], ...
-%     Description="Run integration tests against CTF archive.");
-% plan("ctfIntegTest").Inputs = [plan("ctf").Outputs, "integTests/equivalence"];
-% 
-% 
-% %% Create the deploy task - does nothing but depends on other tasks
-% plan("deploy") = matlab.buildtool.Task(Dependencies="ctfIntegTest", ...
-%     Description="Produce and test a ctf archive to deploy to a MATLAB Production Server");
+%% Integration tests - back-to-back equivalence tests for the production server archive
+plan("ctfIntegTest") = TestTask("integTests/equivalence",SourceFiles=["code","pcode"], ...
+    Description="Run integration tests against CTF archive.");
+plan("ctfIntegTest").Inputs = [plan("ctf").Outputs, "integTests/equivalence"]; % Depends on outputs of ctf task
 
+
+%% Create the deploy task - does nothing but depends on other tasks
+plan("deploy") = matlab.buildtool.Task(Dependencies="ctfIntegTest", ...
+    Description="Produce and test a ctf archive to deploy to a MATLAB Production Server");
+
+% Also called a life cycle task, useful for overall workflow...
 
 %% Produce HTML from workshop live scripts to publish to GitHub pages
 plan("workshop").Inputs = "workshop/**/*.mlx";
@@ -161,28 +164,29 @@ matlab.addons.toolbox.packageToolbox(opts);
 end
 
 
-% %% The "ctf" task action
-% function ctfTask(context)
-% % Create a deployable archive for MATLAB Production Server
-% 
-% ctfArchive = context.Task.Outputs(1).paths;
-% ctfBuildResults = context.Task.Outputs(2).paths;
-% 
-% % Create the archive options for the build.
-% [ctfFolder, ctfFile] = fileparts(ctfArchive);
-% opts = compiler.build.ProductionServerArchiveOptions(...
-%     ["code/simulateSystem.m", "pcode/springMassDamperDesign.m"], ...
-%     FunctionSignatures="buildutils/simulateSystemFunctionSignatures.json", ...
-%     OutputDir=ctfFolder, ...
-%     ArchiveName=ctfFile, ...
-%     ObfuscateArchive="on");
-% 
-% % Build the archive
-% buildResults = compiler.build.productionServerArchive(opts);
-% 
-% save(ctfBuildResults,"buildResults");
-% end
+%% The "ctf" task action
+function ctfTask(context)
+    % Create a deployable archive for MATLAB Production Server
 
+    ctfArchive = context.Task.Outputs(1).paths;
+    ctfBuildResults = context.Task.Outputs(2).paths;
+
+    % Create the archive options for the build.
+    [ctfFolder, ctfFile] = fileparts(ctfArchive);
+    opts = compiler.build.ProductionServerArchiveOptions(...
+        ["code/simulateSystem.m", "pcode/springMassDamperDesign.m"], ...
+        FunctionSignatures="buildutils/simulateSystemFunctionSignatures.json", ...
+        OutputDir=ctfFolder, ...
+        ArchiveName=ctfFile, ...
+        ObfuscateArchive="on");
+
+    % Build the archive
+    buildResults = compiler.build.productionServerArchive(opts);
+
+    save(ctfBuildResults,"buildResults"); % build results + metadata saved to a .mat file
+end
+
+% --> ad-hoc task, local fcn in the build file
 
 %% The "workshop" task action
 function workshopTask(context)
